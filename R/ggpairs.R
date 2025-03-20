@@ -495,7 +495,7 @@ ggduo <- function(
   axisLabels <- fix_axis_label_choice(axisLabels, c("show", "none"))
 
   # get plot type information
-  dataTypes <- plot_types(data, columnsX, columnsY, allowDiag = FALSE)
+  dataTypes <- GGally:::plot_types(data, columnsX, columnsY, allowDiag = FALSE)
 
   ggduoPlots <- lapply(seq_len(nrow(dataTypes)), function(i) {
     plotType <- dataTypes[i, "plotType"]
@@ -799,6 +799,26 @@ ggpairs <- function(
     columns <- mapping
     mapping <- NULL
   }
+
+  is_continuous_var <- function(data, var) {
+    is.numeric(data[[var]])
+  }
+
+  if (!is.null(mapping) && "color" %in% names(mapping)) {
+    color_var <- deparse(mapping$color)
+
+    if (is_continuous_var(data, color_var)) {
+      custom_scatter <- function(data, mapping, ...) {
+        ggplot(data = data, mapping = mapping) +
+          geom_point(...) +
+          scale_color_gradient(low = "blue", high = "red")
+      }
+
+      lower$continuous <- custom_scatter
+      upper$continuous <- custom_scatter
+    }
+  }
+
   stop_if_bad_mapping(mapping)
 
   columns <- fix_column_values(data, columns, columnLabels, "columns", "columnLabels")
@@ -824,7 +844,7 @@ ggpairs <- function(
   proportions <- ggmatrix_proportions(proportions, data, columns)
 
   # get plot type information
-  dataTypes <- plot_types(data, columns, columns, allowDiag = TRUE)
+  dataTypes <- GGally:::plot_types(data, columns, columns, allowDiag = TRUE)
 
   # make internal labels on the diag axis
   if (identical(axisLabels, "internal")) {
@@ -855,6 +875,14 @@ ggpairs <- function(
       types$mapping
     )
 
+    if (plotType == "continuous" && "color" %in% names(sectionAes)) {
+      color_var <- deparse(sectionAes$color)
+      if (is_continuous_var(data, color_var)) {
+        plotObj <- ggplot(data, mapping = sectionAes) +
+          geom_point() +
+          scale_color_gradient(low = "blue", high = "red")
+        return(plotObj)
+      }
     args <- list(types = types, sectionAes = sectionAes)
     if (plotType == "label") {
       args$label <- columnLabels[posX]
@@ -865,7 +893,7 @@ ggpairs <- function(
     p <- do.call(plot_fn, args)
 
     return(p)
-  })
+  }})
 
   plotMatrix <- ggmatrix(
     plots = ggpairsPlots,
